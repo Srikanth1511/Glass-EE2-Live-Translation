@@ -4,7 +4,8 @@ plugins {
 }
 
 android {
-    compileSdkVersion 33
+    namespace 'com.srikanth.glass.livetranslation'
+    compileSdkVersion 31
 
     defaultConfig {
         applicationId "com.srikanth.glass.livetranslation"
@@ -40,9 +41,9 @@ android {
     }
 
     packagingOptions {
-        // Prevent duplicate files
-        pickFirst 'META-INF/LICENSE'
-        pickFirst 'META-INF/NOTICE'
+        resources {
+            pickFirsts += ['META-INF/LICENSE', 'META-INF/NOTICE']
+        }
     }
 }
 

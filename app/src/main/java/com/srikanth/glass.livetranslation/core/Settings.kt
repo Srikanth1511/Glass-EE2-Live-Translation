@@ -16,7 +16,7 @@ class Settings(context: Context) {
         set(value) = prefs.edit().putInt("vad_aggressiveness", value).apply()
 
     var maxSilenceMs: Int
-        get() = prefs.getInt("max_silence_ms", 700)
+        get() = prefs.getInt("max_silence_ms", 600)
         set(value) = prefs.edit().putInt("max_silence_ms", value).apply()
 
     var lastLanguagePair: String

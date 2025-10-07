@@ -5,47 +5,53 @@ import android.media.*
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
+import com.srikanth.glass.livetranslation.core.LangProfiles
+import com.srikanth.glass.livetranslation.core.ModelManager
 import com.srikanth.glass.livetranslation.core.PipelineBus
+import com.srikanth.glass.livetranslation.core.Settings
 import com.srikanth.glass.livetranslation.stt.SttEngine
 import com.srikanth.glass.livetranslation.stt.VoskStt
 import java.io.File
 
 class AudioEngine(
     private val context: Context,
-    private val bus: PipelineBus
+    private val bus: PipelineBus,
+    private val settings: Settings
 ) {
-    private val sampleRate = 16000
+    private val sampleRate = 16_000
     private val frameMs = 20
-    private val samplesPerFrame = sampleRate * frameMs / 1000  // 320 samples
-    private val bufferSize = samplesPerFrame * 4  // 4 frames buffer
+    private val samplesPerFrame = sampleRate * frameMs / 1000
+    private val bufferSize = samplesPerFrame * 4
 
-    private lateinit var audioRecord: AudioRecord
-    private lateinit var handlerThread: HandlerThread
-    private lateinit var handler: Handler
-    private lateinit var sttEngine: SttEngine
-    private lateinit var vadProcessor: VadProcessor
+    private var audioRecord: AudioRecord? = null
+    private var handlerThread: HandlerThread? = null
+    private var handler: Handler? = null
+    private var sttEngine: SttEngine? = null
+    private var vadProcessor: VadProcessor? = null
+    private val readBuffer = ShortArray(samplesPerFrame)
+    private val modelManager = ModelManager(context)
 
     private var isRunning = false
     private var isPaused = false
-    private val readBuffer = ShortArray(samplesPerFrame)
 
-    fun start() {
-        Log.d("AudioEngine", "Starting audio engine")
-
-        // Initialize STT engine
-        sttEngine = VoskStt(bus)
-        val modelPath = getModelPath()
-        if (modelPath.exists()) {
-            sttEngine.start(modelPath.absolutePath)
-        } else {
-            Log.e("AudioEngine", "Model not found at: ${modelPath.absolutePath}")
-            // TODO: Trigger model download
+    fun start(profile: LangProfiles.LanguageProfile) {
+        if (isRunning) {
+            restartWithProfile(profile)
+            return
         }
 
-        // Initialize VAD
-        vadProcessor = VadProcessor(bus, sttEngine)
+        val stt = VoskStt()
+        val modelPath = prepareModel(profile)
+        if (modelPath == null) {
+            Log.e("AudioEngine", "Model not found for ${profile.id}")
+            bus.updateStatus(PipelineBus.StatusChannel.STT, PipelineBus.StatusState.ERROR)
+        } else {
+            stt.start(modelPath.absolutePath)
+        }
 
-        // Create audio record
+        sttEngine = stt
+        vadProcessor = VadProcessor(bus, stt, settings.maxSilenceMs)
+
         val minBufferSize = AudioRecord.getMinBufferSize(
             sampleRate,
             AudioFormat.CHANNEL_IN_MONO,
@@ -62,61 +68,55 @@ class AudioEngine(
             actualBufferSize
         )
 
-        // Enable audio effects
         setupAudioEffects()
 
-        // Start recording on separate thread
         handlerThread = HandlerThread("AudioCapture").apply { start() }
-        handler = Handler(handlerThread.looper)
+        handler = Handler(handlerThread!!.looper)
 
-        audioRecord.startRecording()
+        audioRecord?.startRecording()
         isRunning = true
+        isPaused = false
+        bus.updateStatus(PipelineBus.StatusChannel.MIC, PipelineBus.StatusState.ACTIVE)
+        bus.updateStatus(PipelineBus.StatusChannel.VAD, PipelineBus.StatusState.IDLE)
 
-        handler.post(captureRunnable)
+        handler?.post(captureRunnable)
+    }
+
+    fun restartWithProfile(profile: LangProfiles.LanguageProfile) {
+        stop()
+        start(profile)
     }
 
     private val captureRunnable = object : Runnable {
         override fun run() {
             if (!isRunning) return
+            val recorder = audioRecord ?: return
+            val vad = vadProcessor ?: return
 
             if (!isPaused) {
-                val read = audioRecord.read(readBuffer, 0, samplesPerFrame)
-
+                val read = recorder.read(readBuffer, 0, samplesPerFrame)
                 if (read > 0) {
-                    // Send to VAD and STT pipeline
-                    vadProcessor.processFrame(readBuffer, read)
+                    vad.processFrame(readBuffer, read)
                 } else if (read < 0) {
                     Log.e("AudioEngine", "Audio read error: $read")
                 }
             }
 
-            // Schedule next read (every 20ms)
-            handler.postDelayed(this, frameMs.toLong())
+            handler?.postDelayed(this, frameMs.toLong())
         }
     }
 
     private fun setupAudioEffects() {
         try {
-            val sessionId = audioRecord.audioSessionId
-
-            // Noise suppression
+            val sessionId = audioRecord?.audioSessionId ?: return
             if (NoiseSuppressor.isAvailable()) {
-                val ns = NoiseSuppressor.create(sessionId)
-                ns?.enabled = true
-                Log.d("AudioEngine", "Noise suppressor enabled")
+                NoiseSuppressor.create(sessionId)?.enabled = true
             }
-
-            // Automatic gain control
             if (AutomaticGainControl.isAvailable()) {
-                val agc = AutomaticGainControl.create(sessionId)
-                agc?.enabled = true
-                Log.d("AudioEngine", "AGC enabled")
+                AutomaticGainControl.create(sessionId)?.enabled = true
             }
-
-            // Acoustic echo canceler (usually not needed for Glass)
             if (AcousticEchoCanceler.isAvailable()) {
-                val aec = AcousticEchoCanceler.create(sessionId)
-                aec?.enabled = false  // No speaker output on Glass
+                AcousticEchoCanceler.create(sessionId)?.enabled = false
             }
         } catch (e: Exception) {
             Log.e("AudioEngine", "Error setting up audio effects", e)
@@ -124,44 +124,58 @@ class AudioEngine(
     }
 
     fun pause() {
+        if (!isRunning) return
         isPaused = true
-        Log.d("AudioEngine", "Audio paused")
+        bus.updateStatus(PipelineBus.StatusChannel.MIC, PipelineBus.StatusState.PAUSED)
     }
 
     fun resume() {
+        if (!isRunning) return
         isPaused = false
-        Log.d("AudioEngine", "Audio resumed")
+        bus.updateStatus(PipelineBus.StatusChannel.MIC, PipelineBus.StatusState.ACTIVE)
     }
 
     fun stop() {
-        Log.d("AudioEngine", "Stopping audio engine")
         isRunning = false
         isPaused = false
 
-        handler.removeCallbacks(captureRunnable)
-        handlerThread.quitSafely()
+        handler?.removeCallbacks(captureRunnable)
+        handlerThread?.quitSafely()
+        handlerThread = null
+        handler = null
 
         try {
-            audioRecord.stop()
-            audioRecord.release()
+            audioRecord?.stop()
+            audioRecord?.release()
         } catch (e: Exception) {
             Log.e("AudioEngine", "Error stopping audio", e)
         }
+        audioRecord = null
 
-        sttEngine.stop()
+        sttEngine?.stop()
+        sttEngine = null
+        vadProcessor = null
+
+        bus.updateStatus(PipelineBus.StatusChannel.MIC, PipelineBus.StatusState.IDLE)
+        bus.updateStatus(PipelineBus.StatusChannel.VAD, PipelineBus.StatusState.IDLE)
     }
 
-    private fun getModelPath(): File {
-        // Check for downloaded model
-        val modelsDir = File(context.filesDir, "models")
-        val modelFile = File(modelsDir, "vosk-model-small-en-us-0.15")
-
-        if (modelFile.exists()) {
-            return modelFile
+    private fun prepareModel(profile: LangProfiles.LanguageProfile): File? {
+        val modelDir = modelManager.getModelDir(profile.sttModel)
+        if (modelDir.exists()) {
+            return modelDir
         }
 
-        // Fall back to assets (if bundled)
-        val assetsModel = File(context.filesDir, "vosk-model-en-us")
-        return assetsModel
+        val assetsPath = "models/${profile.sttModel}"
+        return try {
+            if (modelManager.assetExists(assetsPath)) {
+                modelManager.installFromAssets(assetsPath, profile.sttModel)
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("AudioEngine", "Failed to copy model", e)
+            null
+        }
     }
 }

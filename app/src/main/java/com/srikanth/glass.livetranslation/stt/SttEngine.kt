@@ -36,7 +36,8 @@ interface SttEngine {
  */
 data class SttPartial(
     val text: String,
-    val confidence: Float = 0.0f
+    val confidence: Float = 0.0f,
+    val isFinal: Boolean = false
 )
 
 /**

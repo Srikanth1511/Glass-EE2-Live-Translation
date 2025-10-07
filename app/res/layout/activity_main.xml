@@ -4,51 +4,151 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000"
+    android:background="@color/paneBackground"
     android:keepScreenOn="true">
 
-    <TextView
-        android:id="@+id/sourceView"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:gravity="bottom|start"
-        android:padding="8dp"
-        android:textColor="#FFFFFF"
-        android:textSize="26sp"
-        android:fontFamily="monospace"
-        app:layout_constraintEnd_toStartOf="@+id/divider"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintWidth_percent="0.5" />
-
-    <View
-        android:id="@+id/divider"
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:background="#444444"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <TextView
-        android:id="@+id/targetView"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
-        android:gravity="bottom|start"
-        android:padding="8dp"
-        android:textColor="#A6E22E"
-        android:textSize="26sp"
-        android:fontFamily="monospace"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@+id/divider" />
-
-    <TextView
-        android:id="@+id/status"
+    <LinearLayout
+        android:id="@+id/statusContainer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="4dp"
-        android:text="🎤 READY"
-        android:textColor="#BBBBBB"
-        android:textSize="14sp"
+        android:orientation="vertical"
+        android:padding="8dp"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/languageChip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="6dp"
+            android:background="@drawable/chip_background"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="Language"
+            android:textColor="@color/chipText"
+            android:textSize="16sp" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:orientation="horizontal"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="2dp">
+
+            <TextView
+                android:id="@+id/micChip"
+                style="@style/StatusChip"
+                android:text="MIC" />
+
+            <TextView
+                android:id="@+id/vadChip"
+                style="@style/StatusChip"
+                android:text="VAD"
+                android:layout_marginStart="6dp" />
+
+            <TextView
+                android:id="@+id/sttChip"
+                style="@style/StatusChip"
+                android:text="STT"
+                android:layout_marginStart="6dp" />
+
+            <TextView
+                android:id="@+id/translationChip"
+                style="@style/StatusChip"
+                android:text="TR"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/paneContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/statusContainer">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@color/paneLeft"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ScrollView
+                android:id="@+id/sourceScroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:overScrollMode="never">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/sourceCommitted"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:gravity="bottom|start"
+                        android:textColor="@color/sourceText"
+                        android:textSize="26sp" />
+
+                    <TextView
+                        android:id="@+id/sourcePartial"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="monospace"
+                        android:gravity="bottom|start"
+                        android:textColor="@color/sourcePartialText"
+                        android:textSize="22sp"
+                        android:textStyle="italic"
+                        android:visibility="invisible" />
+                </LinearLayout>
+            </ScrollView>
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="match_parent"
+            android:background="@color/paneDivider"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@color/paneRight"
+            android:orientation="vertical"
+            android:padding="12dp">
+
+            <ScrollView
+                android:id="@+id/targetScroll"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:overScrollMode="never">
+
+                <TextView
+                    android:id="@+id/targetCommitted"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="monospace"
+                    android:gravity="bottom|start"
+                    android:textColor="@color/targetText"
+                    android:textSize="26sp" />
+            </ScrollView>
+        </LinearLayout>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

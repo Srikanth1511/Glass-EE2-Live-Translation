@@ -1,25 +1,26 @@
 package com.srikanth.glass.livetranslation.audio
 
-import android.util.Log
 import com.srikanth.glass.livetranslation.core.PipelineBus
 import com.srikanth.glass.livetranslation.stt.SttEngine
+import com.srikanth.glass.livetranslation.stt.SttFinal
+import com.srikanth.glass.livetranslation.stt.SttPartial
 
 /**
- * Simple energy-based Voice Activity Detection
- * Replaces WebRTC VAD for initial implementation simplicity
+ * Lightweight VAD/segmenter used until the WebRTC VAD JNI binding is wired.
+ * It tracks running energy and marks an utterance boundary after the configured
+ * amount of trailing silence. Frames are 20 ms at 16 kHz.
  */
 class VadProcessor(
     private val bus: PipelineBus,
-    private val sttEngine: SttEngine
+    private val sttEngine: SttEngine,
+    private val maxSilenceMs: Int,
+    private val frameMs: Int = 20
 ) {
-    // Energy threshold for speech detection
-    private var energyThreshold = 1000.0
+    private var energyThreshold = 1_000.0
     private val adaptationRate = 0.01
     private var runningEnergy = 0.0
 
-    // Silence detection for sentence boundaries
-    private val maxSilenceMs = 700
-    private val frameMs = 20
+    private val silenceFrameLimit = maxSilenceMs / frameMs
     private var silenceFrameCount = 0
     private var speechFrameCount = 0
 
@@ -27,52 +28,52 @@ class VadProcessor(
     private var hasPendingUtterance = false
 
     fun processFrame(samples: ShortArray, length: Int) {
-        // Calculate frame energy (RMS)
         val energy = calculateEnergy(samples, length)
-
-        // Adapt threshold using exponential moving average
         runningEnergy = runningEnergy * (1 - adaptationRate) + energy * adaptationRate
-
-        // Simple hysteresis: threshold is 2x running average
-        val threshold = runningEnergy * 2.0
-
-        val isSpeech = energy > maxOf(threshold, energyThreshold)
+        val dynamicThreshold = runningEnergy * 2.0
+        val isSpeech = energy > maxOf(dynamicThreshold, energyThreshold)
 
         if (isSpeech) {
-            silenceFrameCount = 0
-            speechFrameCount++
-
-            if (!isSpeaking && speechFrameCount > 3) {
-                // Start of speech detected
+            if (!isSpeaking) {
                 isSpeaking = true
-                Log.d("VAD", "Speech START")
+                bus.onVadStateChanged(true)
             }
 
-            // Send frame to STT
-            val partial = sttEngine.acceptPcm(samples, length)
-            partial?.let {
-                hasPendingUtterance = true
-                bus.onSttPartial(it)
-            }
+            speechFrameCount++
+            silenceFrameCount = 0
 
-        } else {
-            speechFrameCount = 0
-            silenceFrameCount++
-
-            val silenceMs = silenceFrameCount * frameMs
-
-            if (isSpeaking && silenceMs >= maxSilenceMs) {
-                // End of speech detected
-                isSpeaking = false
-                Log.d("VAD", "Speech END (${silenceMs}ms silence)")
-
-                // Flush STT for final result
-                if (hasPendingUtterance) {
-                    val final = sttEngine.flush()
-                    final?.let { bus.onSttFinal(it) }
+            val update = sttEngine.acceptPcm(samples, length)
+            when {
+                update == null -> return
+                update.isFinal -> {
                     hasPendingUtterance = false
+                    bus.onSttFinal(SttFinal(update.text, update.confidence))
+                    isSpeaking = false
+                    bus.onVadStateChanged(false)
                 }
+                else -> {
+                    hasPendingUtterance = true
+                    bus.onSttPartial(SttPartial(update.text, update.confidence))
+                }
+            }
+        } else {
+            if (isSpeaking) {
+                silenceFrameCount++
+                if (silenceFrameCount >= silenceFrameLimit) {
+                    isSpeaking = false
+                    bus.onVadStateChanged(false)
+                    silenceFrameCount = 0
 
+                    if (hasPendingUtterance) {
+                        val final = sttEngine.flush()
+                        if (final != null && final.text.isNotBlank()) {
+                            bus.onSttFinal(final)
+                        }
+                        hasPendingUtterance = false
+                    }
+                }
+            } else {
+                speechFrameCount = 0
                 silenceFrameCount = 0
             }
         }
@@ -86,20 +87,4 @@ class VadProcessor(
         }
         return Math.sqrt(sum / length)
     }
-
-    /**
-     * Alternative: WebRTC VAD integration (if library available)
-     * Uncomment and use if you integrate actual WebRTC VAD
-     */
-    /*
-    private val webrtcVad = WebRtcVad().apply {
-        setSampleRate(WebRtcVad.SampleRate.SAMPLE_RATE_16KHZ)
-        setMode(WebRtcVad.Mode.VERY_AGGRESSIVE)
-    }
-
-    fun processFrameWebRTC(samples: ShortArray, length: Int) {
-        val isSpeech = webrtcVad.isSpeech(samples)
-        // ... rest of logic
-    }
-    */
 }

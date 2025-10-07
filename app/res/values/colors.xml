@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="paneBackground">#0A0A0A</color>
+    <color name="paneLeft">#111111</color>
+    <color name="paneRight">#111711</color>
+    <color name="paneDivider">#333333</color>
+    <color name="sourceText">#FFFFFF</color>
+    <color name="sourcePartialText">#B0B0B0</color>
+    <color name="targetText">#A6E22E</color>
+    <color name="chipText">#FFFFFF</color>
+    <color name="chipIdle">#424242</color>
+    <color name="chipActive">#1B5E20</color>
+    <color name="chipBusy">#3367D6</color>
+    <color name="chipPaused">#C87F0A</color>
+    <color name="chipError">#B00020</color>
+</resources>

@@ -1,0 +1,122 @@
+plugins {
+    id 'com.android.application'
+    id 'kotlin-android'
+}
+
+android {
+    compileSdkVersion 33
+
+    defaultConfig {
+        applicationId "com.srikanth.glass.livetranslation"
+        minSdkVersion 27
+        targetSdkVersion 27
+        versionCode 1
+        versionName "0.1.0"
+
+        // Native library filters
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a'
+        }
+    }
+
+    buildTypes {
+        debug {
+            debuggable true
+            minifyEnabled false
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    packagingOptions {
+        // Prevent duplicate files
+        pickFirst 'META-INF/LICENSE'
+        pickFirst 'META-INF/NOTICE'
+    }
+}
+
+dependencies {
+    // Kotlin
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.7.20"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4"
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4"
+
+    // AndroidX
+    implementation 'androidx.core:core-ktx:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Vosk Speech Recognition
+    // Download AAR from: https://github.com/alphacep/vosk-android-demo/tree/master/models
+    // Or use Maven if available
+    implementation 'com.alphacephei:vosk-android:0.3.47@aar'
+
+    // OkHttp for HTTP translation APIs
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+
+    // JSON parsing (included in Android but explicit dependency)
+    implementation 'org.json:json:20230227'
+
+    // Optional: Logging
+    implementation 'com.jakewharton.timber:timber:5.0.1'
+}
+
+// Task to download Vosk models (run manually)
+task downloadVoskModels {
+    doLast {
+        println "=========================================="
+        println "MANUAL STEP: Download Vosk models"
+        println "=========================================="
+        println ""
+        println "1. Visit: https://alphacephei.com/vosk/models"
+        println "2. Download small models for your languages:"
+        println "   - EN: vosk-model-small-en-us-0.15 (40MB)"
+        println "   - ES: vosk-model-small-es-0.42 (40MB)"
+        println "   - FR: vosk-model-small-fr-0.22 (40MB)"
+        println "   - DE: vosk-model-small-de-0.15 (45MB)"
+        println "   - HI: vosk-model-small-hi-0.22 (40MB)"
+        println ""
+        println "3. Extract and place in:"
+        println "   app/src/main/assets/models/[model-name]/"
+        println ""
+        println "   OR (better for size):"
+        println "   Download to device at runtime:"
+        println "   /data/data/com.srikanth.glass.livetranslation/files/models/"
+        println ""
+        println "=========================================="
+    }
+}
+
+// Task to setup project structure
+task setupProject {
+    doLast {
+        // Create necessary directories
+        def dirs = [
+                'src/main/assets/models',
+                'src/main/jniLibs/armeabi-v7a',
+                'src/main/jniLibs/arm64-v8a',
+                'src/main/res/drawable'
+        ]
+
+        dirs.each { dir ->
+            new File(projectDir, dir).mkdirs()
+        }
+
+        println "Project structure created"
+        println "Next steps:"
+        println "1. Run: ./gradlew downloadVoskModels"
+        println "2. Add ic_mic.xml to res/drawable/"
+        println "3. Sync project with Gradle files"
+    }
+}

@@ -185,6 +185,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun checkAndDownloadModels() {
+        val modelDir = File(filesDir, "models/vosk-model-small-en-us-0.15")
+        if (!modelDir.exists()) {
+            // Show download dialog
+            // Download from https://alphacephei.com/vosk/models
+            // Extract to app files directory
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         try {

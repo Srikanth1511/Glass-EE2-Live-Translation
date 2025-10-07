@@ -1,3 +1,19 @@
+STT (default): Vosk (Kaldi-based) has an Android streaming demo/AAR and small 16 kHz models. Good accuracy/latency on modest CPUs.
+GitHub
+
+STT (alt): Picovoice Leopard/Cheetah (on-device, licensed; languages limited but very efficient).
+picovoice.ai
++1
+
+STT (edge): Whisper / Faster-Whisper over LAN for higher quality; the app streams PCM and receives partials (code scaffold included).
+
+Translation (default): Apertium (rule-based, tiny, fully offline).
+
+Translation (better offline, advanced): Bergamot/Marian via JNI; heavier to port but higher quality; feasible as a later phase.
+GitHub
++1
+
+Translation (edge): CTranslate2 server (OPUS-MT models) for fast neural MT on a nearby machine
 # Glass EE2 Live Translation
 
 Offline-first split-pane transcription + translation client targeting Google Glass Enterprise Edition 2 (Android 8.1 / API 27).
